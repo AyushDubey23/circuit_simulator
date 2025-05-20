@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VOLTREX</title>
+  <title>CircuitLab Pro - Interactive Circuit Simulator</title>
   <style>
     * {
       box-sizing: border-box;
@@ -16,7 +16,6 @@
       background-color: #121212;
       color: #fff;
       flex-direction: column;
-      overflow: hidden;
     }
     .orientation-message {
       position: absolute;
@@ -34,7 +33,6 @@
       display: flex;
       flex: 1;
       flex-direction: row;
-      overflow: hidden;
     }
     .sidebar {
       width: 280px;
@@ -54,7 +52,6 @@
       border: 1px solid #444;
       cursor: grab;
       transition: background 0.2s;
-      touch-action: none;
     }
     .component:hover {
       background: #333;
@@ -64,7 +61,6 @@
       position: relative;
       background: #181818;
       overflow: hidden;
-      touch-action: none;
     }
     .placed {
       position: absolute;
@@ -76,7 +72,6 @@
       user-select: none;
       cursor: pointer;
       z-index: 10;
-      touch-action: none;
     }
     .placed.switch-off {
       background-color: #111;
@@ -186,101 +181,16 @@
     const info = document.getElementById("info");
     let startWire = null;
     const wires = [];
-    let draggedComponent = null;
-    let offsetX, offsetY;
 
     document.querySelectorAll(".component").forEach(comp => {
-      comp.addEventListener("dragstart", handleDragStart);
-      comp.addEventListener("touchstart", handleTouchStart, { passive: false });
+      comp.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", e.target.dataset.type);
+      });
     });
 
     canvas.addEventListener("dragover", (e) => e.preventDefault());
-    canvas.addEventListener("drop", handleDrop);
-    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
-    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
 
-    function handleDragStart(e) {
-      e.dataTransfer.setData("text/plain", e.target.dataset.type);
-    }
-
-    function handleTouchStart(e) {
-      const touch = e.touches[0];
-      const component = e.target;
-      draggedComponent = component.cloneNode(true);
-      draggedComponent.style.position = 'absolute';
-      draggedComponent.style.left = `${touch.clientX}px`;
-      draggedComponent.style.top = `${touch.clientY}px`;
-      draggedComponent.style.width = `${component.offsetWidth}px`;
-      document.body.appendChild(draggedComponent);
-      offsetX = touch.clientX - component.getBoundingClientRect().left;
-      offsetY = touch.clientY - component.getBoundingClientRect().top;
-      e.preventDefault();
-    }
-
-    function handleTouchMove(e) {
-      if (!draggedComponent) return;
-      const touch = e.touches[0];
-      draggedComponent.style.left = `${touch.clientX - offsetX}px`;
-      draggedComponent.style.top = `${touch.clientY - offsetY}px`;
-      e.preventDefault();
-    }
-
-    function handleTouchEnd(e) {
-      if (!draggedComponent) return;
-      const touch = e.changedTouches[0];
-      const canvasRect = canvas.getBoundingClientRect();
-      if (touch.clientX > canvasRect.left && touch.clientX < canvasRect.right &&
-          touch.clientY > canvasRect.top && touch.clientY < canvasRect.bottom) {
-        const type = draggedComponent.dataset.type;
-        const element = document.createElement("div");
-        element.classList.add("placed");
-        element.dataset.type = type;
-        element.style.left = `${touch.clientX - canvasRect.left - offsetX}px`;
-        element.style.top = `${touch.clientY - canvasRect.top - offsetY}px`;
-
-        if (type === "battery") {
-          const voltage = document.getElementById("customVoltage").value || 5;
-          element.dataset.voltage = voltage;
-          element.innerText = `🔋 Battery (${voltage}V)`;
-        } else if (type === "resistor") {
-          const resistance = document.getElementById("customResistance").value || 220;
-          element.dataset.resistance = resistance;
-          element.innerText = `⚡ Resistor (${resistance}Ω)`;
-        } else {
-          const labelMap = {
-            led: "💡 LED",
-            capacitor: "📦 Capacitor (100μF)",
-            switch: "🔘 Switch",
-            ground: "🌍 Ground",
-            ammeter: "📟 Ammeter",
-            voltmeter: "🧭 Voltmeter",
-            bulb: "💡 Bulb",
-            motor: "🔁 Motor",
-            diode: "↪ Diode"
-          };
-          element.innerText = labelMap[type] || type;
-        }
-
-        if (type === 'switch') {
-          element.classList.add("switch-off");
-          element.addEventListener("dblclick", () => {
-            element.classList.toggle("switch-off");
-            element.classList.toggle("switch-on");
-          });
-        }
-
-        element.addEventListener("click", () => handleWireConnection(element));
-        element.addEventListener("mouseenter", () => showHoverInfo(element));
-        element.addEventListener("mouseleave", () => info.innerText = "Drop components, connect, and click Simulate.");
-
-        canvas.appendChild(element);
-      }
-      document.body.removeChild(draggedComponent);
-      draggedComponent = null;
-      e.preventDefault();
-    }
-
-    function handleDrop(e) {
+    canvas.addEventListener("drop", (e) => {
       e.preventDefault();
       const type = e.dataTransfer.getData("text/plain");
       const element = document.createElement("div");
@@ -325,7 +235,7 @@
       element.addEventListener("mouseleave", () => info.innerText = "Drop components, connect, and click Simulate.");
 
       canvas.appendChild(element);
-    }
+    });
 
     function simulateCircuit() {
       const components = document.querySelectorAll(".placed");
