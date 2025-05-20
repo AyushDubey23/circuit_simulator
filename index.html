@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voltrex-Electrical Project by Ayush Dubey</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      height: 100vh;
+      background-color: #121212;
+      color: #fff;
+      flex-direction: column;
+    }
+    .orientation-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      z-index: 1000;
+      display: none;
+    }
+    .main-content {
+      display: flex;
+      flex: 1;
+      flex-direction: row;
+    }
+    .sidebar {
+      width: 280px;
+      background: #1e1e1e;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      border-right: 1px solid #333;
+      overflow-y: auto;
+    }
+    .component {
+      background: #292929;
+      padding: 12px;
+      text-align: center;
+      border-radius: 8px;
+      border: 1px solid #444;
+      cursor: grab;
+      transition: background 0.2s;
+    }
+    .component:hover {
+      background: #333;
+    }
+    .canvas {
+      flex: 1;
+      position: relative;
+      background: #181818;
+      overflow: hidden;
+    }
+    .placed {
+      position: absolute;
+      padding: 10px 14px;
+      background: #2e2e2e;
+      border: 1px solid #555;
+      border-radius: 6px;
+      font-size: 14px;
+      user-select: none;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .placed.switch-off {
+      background-color: #111;
+    }
+    .placed.switch-on {
+      background-color: #fff;
+      color: #000;
+    }
+    .placed.bulb-on {
+      box-shadow: 0 0 20px 10px yellow;
+    }
+    .wire {
+      position: absolute;
+      height: 4px;
+      background: white;
+      z-index: 1;
+      border-radius: 4px;
+      transition: background-color 0.3s ease;
+    }
+    .wire.active {
+      background: #00ffcc;
+      box-shadow: 0 0 10px #00ffcc;
+    }
+    .notification-container {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #info {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      border: 1px solid #444;
+      white-space: pre-wrap;
+    }
+    .simulate-button-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+    .simulate-button {
+      padding: 12px 24px;
+      border: none;
+      background-color: #0d6efd;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 16px;
+    }
+    .simulate-button:hover {
+      background-color: #0b5ed7;
+    }
+    @media (max-width: 768px) and (orientation: portrait) {
+      .orientation-message {
+        display: block;
+      }
+      .main-content {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="orientation-message">
+    <h2>Please rotate your device to horizontal orientation for the best experience</h2>
+  </div>
+  <div class="main-content">
+    <div class="sidebar">
+      <h2 style="margin-top:0">🧰 Components</h2>
+      <input type="number" id="customVoltage" placeholder="Battery Voltage (V)" style="padding:8px;border-radius:4px;">
+      <input type="number" id="customResistance" placeholder="Resistor Ω" style="padding:8px;border-radius:4px;">
+      <div class="component" draggable="true" data-type="battery">🔋 Battery (Custom V)</div>
+      <div class="component" draggable="true" data-type="resistor">⚡ Resistor (Custom Ω)</div>
+      <div class="component" draggable="true" data-type="led">💡 LED</div>
+      <div class="component" draggable="true" data-type="capacitor">📦 Capacitor (100μF)</div>
+      <div class="component" draggable="true" data-type="switch">🔘 Switch</div>
+      <div class="component" draggable="true" data-type="ground">🌍 Ground</div>
+      <div class="component" draggable="true" data-type="ammeter">📟 Ammeter</div>
+      <div class="component" draggable="true" data-type="voltmeter">🧭 Voltmeter</div>
+      <div class="component" draggable="true" data-type="bulb">💡 Bulb</div>
+      <div class="component" draggable="true" data-type="motor">🔁 Motor</div>
+      <div class="component" draggable="true" data-type="diode">↪ Diode</div>
+    </div>
+    <div class="canvas" id="canvas">
+      <div class="notification-container">
+        <div id="info">Drop components, connect, and click Simulate.</div>
+      </div>
+    </div>
+  </div>
+  <div class="simulate-button-container">
+    <button class="simulate-button" onclick="simulateCircuit()">▶ Simulate</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const info = document.getElementById("info");
+    let startWire = null;
+    const wires = [];
+
+    document.querySelectorAll(".component").forEach(comp => {
+      comp.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", e.target.dataset.type);
+      });
+    });
+
+    canvas.addEventListener("dragover", (e) => e.preventDefault());
+
+    canvas.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const type = e.dataTransfer.getData("text/plain");
+      const element = document.createElement("div");
+      element.classList.add("placed");
+      element.dataset.type = type;
+      element.style.left = `${e.offsetX}px`;
+      element.style.top = `${e.offsetY}px`;
+
+      if (type === "battery") {
+        const voltage = document.getElementById("customVoltage").value || 5;
+        element.dataset.voltage = voltage;
+        element.innerText = `🔋 Battery (${voltage}V)`;
+      } else if (type === "resistor") {
+        const resistance = document.getElementById("customResistance").value || 220;
+        element.dataset.resistance = resistance;
+        element.innerText = `⚡ Resistor (${resistance}Ω)`;
+      } else {
+        const labelMap = {
+          led: "💡 LED",
+          capacitor: "📦 Capacitor (100μF)",
+          switch: "🔘 Switch",
+          ground: "🌍 Ground",
+          ammeter: "📟 Ammeter",
+          voltmeter: "🧭 Voltmeter",
+          bulb: "💡 Bulb",
+          motor: "🔁 Motor",
+          diode: "↪ Diode"
+        };
+        element.innerText = labelMap[type] || type;
+      }
+
+      if (type === 'switch') {
+        element.classList.add("switch-off");
+        element.addEventListener("dblclick", () => {
+          element.classList.toggle("switch-off");
+          element.classList.toggle("switch-on");
+        });
+      }
+
+      element.addEventListener("click", () => handleWireConnection(element));
+      element.addEventListener("mouseenter", () => showHoverInfo(element));
+      element.addEventListener("mouseleave", () => info.innerText = "Drop components, connect, and click Simulate.");
+
+      canvas.appendChild(element);
+    });
+
+    function simulateCircuit() {
+      const components = document.querySelectorAll(".placed");
+      let voltage = 0, resistance = 0, hasLED = false, hasBulb = false, hasSwitchOn = false, hasGround = false;
+      let ammeterCount = 0, voltmeterCount = 0;
+
+      components.forEach(el => {
+        const type = el.dataset.type;
+        if (type === "battery") voltage += parseFloat(el.dataset.voltage || 5);
+        if (type === "resistor") resistance += parseFloat(el.dataset.resistance || 220);
+        if (type === "led") hasLED = true;
+        if (type === "bulb") hasBulb = true;
+        if (type === "switch" && el.classList.contains("switch-on")) hasSwitchOn = true;
+        if (type === "ground") hasGround = true;
+        if (type === "ammeter") ammeterCount++;
+        if (type === "voltmeter") voltmeterCount++;
+      });
+
+      const current = (voltage && resistance && hasSwitchOn && hasGround) ? (voltage / resistance).toFixed(3) : 0;
+      const ledGlow = hasLED && current > 0.01;
+      const bulbGlow = hasBulb && current > 0.01;
+
+      document.querySelectorAll('.wire').forEach(w => w.classList.remove('active'));
+      if (current > 0) wires.forEach(w => w.classList.add('active'));
+
+      document.querySelectorAll('.placed.bulb-on').forEach(el => el.classList.remove('bulb-on'));
+      if (bulbGlow) {
+        components.forEach(el => {
+          if (el.dataset.type === 'bulb') el.classList.add('bulb-on');
+        });
+      }
+
+      let extraInfo = "";
+      if (!hasGround) extraInfo += "❗ Missing ground to complete the circuit.\n";
+      if (!hasSwitchOn) extraInfo += "❗ Switch is OFF. Turn it ON to allow current.\n";
+      if (current <= 0.01) extraInfo += "❗ Current too low to glow LED/Bulb. Try increasing voltage or reducing resistance.\n";
+
+      info.innerText =
+        `📊 Total Voltage: ${voltage}V\n🧮 Total Resistance: ${resistance}Ω\n🔌 Current: ${current}A\n💡 LED Status: ${ledGlow ? 'Glows ✅' : 'Does Not Glow ❌'}\n💡 Bulb Status: ${bulbGlow ? 'Glows ✅' : 'Does Not Glow ❌'}\n📟 Ammeters Used: ${ammeterCount}\n🧭 Voltmeters Used: ${voltmeterCount}\n${extraInfo}`;
+    }
+
+    function handleWireConnection(element) {
+      if (!startWire) {
+        startWire = element;
+        startWire.style.outline = '2px dashed #00ffcc';
+      } else {
+        const wire = drawWire(startWire, element);
+        wires.push(wire);
+        startWire.style.outline = 'none';
+        startWire = null;
+      }
+    }
+
+    function drawWire(start, end) {
+      const wire = document.createElement("div");
+      wire.classList.add("wire");
+      const x1 = start.offsetLeft + start.offsetWidth / 2;
+      const y1 = start.offsetTop + start.offsetHeight / 2;
+      const x2 = end.offsetLeft + end.offsetWidth / 2;
+      const y2 = end.offsetTop + end.offsetHeight / 2;
+
+      const length = Math.hypot(x2 - x1, y2 - y1);
+      const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+      wire.style.width = `${length}px`;
+      wire.style.transform = `rotate(${angle}deg)`;
+      wire.style.left = `${x1}px`;
+      wire.style.top = `${y1}px`;
+      wire.style.transformOrigin = "left center";
+
+      canvas.appendChild(wire);
+      return wire;
+    }
+
+    function showHoverInfo(element) {
+      const type = element.dataset.type;
+      let detail = "";
+      switch (type) {
+        case "battery": detail = `Provides ${element.dataset.voltage || 5}V power.`; break;
+        case "resistor": detail = `Resistance: ${element.dataset.resistance || 220}Ω`; break;
+        case "led": detail = "Lights up if current > 0.01A"; break;
+        case "bulb": detail = "Bulb glows when current > 0.01A"; break;
+        case "switch": detail = element.classList.contains("switch-on") ? "Switch is ON" : "Switch is OFF"; break;
+        case "capacitor": detail = "Capacitance: 100μF (not simulated)"; break;
+        case "ground": detail = "Completes the circuit."; break;
+        case "ammeter": detail = "Counts and displays current (logic planned)."; break;
+        case "voltmeter": detail = "Displays total voltage (planned)."; break;
+        case "motor": detail = "Rotates with sufficient current (not simulated)."; break;
+        case "diode": detail = "Allows current in one direction (not simulated)."; break;
+        default: detail = "Generic component.";
+      }
+      info.innerText = `ℹ️ ${element.innerText}\n${detail}`;
+    }
+  </script>
+</body>
+</html>
